@@ -1,28 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime, date
 
-def stringfy(value):
-
-    if type(value) == str:
-        # symbols = ['\\', '"', "(", ")", "%", '&', '@', '*', '[', ']', '{', '}', '^', '!', '/', '-', '+', '?', ';', '~', '|']
-        # for symbol in symbols:
-        #     value = value.replace(symbol, '\\'+f'{symbol}')             
-        value = value.replace("'", "''") 
-        return f"'{value}'"
-
-    elif type(value)==datetime :
-        value = value.strftime(format='%Y-%m-%d %H:%M:%S')
-        return f"'{value}'"
-
-    elif type(value)==date :
-        value = value.strftime(format='%Y-%m-%d')
-        return f"'{value}'"
-
-    elif value == None:
-        return 'Null'
-
-    else:
-        return f'{value}'
 
 class TableIdentifier:
 
@@ -162,7 +140,7 @@ class InsertSql:
     def get_values_part(self):
         data = self.dict().values()
         values_part_lst = [stringfy(value) for value in data]
-        values_part = ', '.join(values_part_lst)
+        values_part = ','.join(values_part_lst)
         return f'({values_part})'
 
     def get_values_parts(self):
@@ -174,11 +152,13 @@ class InsertSql:
         table_name = TableNameExporter().get_table_name(model = self.__class__)
         fields = list(TableFieldsInfoExporter().get_fields_info(model=self.__class__).keys())
         if TableIdentifier().check_dataset_model(model=self.__class__):
-            values_part = self.get_values_parts()
+            data = tuple(self.data[0].dict().values())
         else:
-            values_part = self.get_values_part()
+            data = tuple(self.dict().values()) 
         fields_part = ', '.join(fields)
-        sql = f'INSERT INTO {table_name} ({fields_part}) VALUES{values_part}'
+        q_marks = '('+','.join(f'?'*len(data))+')'
+        q_marks = '('+','.join(['%s' for i in range(0, len(data))])+')'
+        sql = f'INSERT INTO {table_name} ({fields_part}) VALUES {q_marks}' 
         print(f'insert sql : \n {sql[:1000]}')
         return sql
 

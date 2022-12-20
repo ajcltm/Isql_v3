@@ -65,19 +65,19 @@ class DBM:
 
         if not check_dataset(model=data.__class__):
             sql = data.get_insert()
-            self.cur.execute(sql)
+            self.cur.execute(sql, tuple(data.dict().values()))
             self.con.commit()
             return
 
         if not check_scale(dataset=data):
             sql = data.get_insert()
-            self.cur.execute(sql)
+            self.cur.executemany(sql, [tuple(i.dict().values()) for i in data.data])
             self.con.commit()
             return
 
         for data in chunk_dataset(dataset=data):
             sql = data.get_insert()
-            self.cur.execute(sql)
+            self.cur.executemany(sql, [tuple(i.dict().values()) for i in data.data])
             self.con.commit()
     
     def delete_data(self, model, **condition):

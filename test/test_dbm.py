@@ -66,11 +66,11 @@ class Test_1_dbm(unittest.TestCase):
         self.data2 = TestModel(**self.raw_data2)
         self.data3 = TestModel(**self.raw_data3)
         self.data4 = TestModel(**self.raw_data4)
-        self.dataset = TestModels(data=[self.data1, self.data2, self.data3])
+        self.dataset = TestModels(data=[self.data1, self.data2, self.data3, self.data4])
 
         self.db_path = Path.cwd().joinpath('test','test.db') 
         connect = sqlite3.connect(self.db_path)
-        # connect = pymysql.connect(host='192.168.35.243', port=3306, user='ajcltm', passwd='2642805Ab!', db='test', charset='utf8')
+        connect = pymysql.connect(host='192.168.35.243', port=3306, user='ajcltm', passwd='2642805Ab!', db='test', charset='utf8')
         self.db = DBM(connect=connect)
     
     @unittest.skip('for some reason')
@@ -92,7 +92,7 @@ class Test_1_dbm(unittest.TestCase):
         self.db.insert_data(data=self.data4)
         self.db.insert_data(data=self.dataset)
     
-    @unittest.skip('for some reason')
+    # @unittest.skip('for some reason')
     def test_4_insert_large_scale_data(self):
         def create_data(num):
             raw_data = {
@@ -111,7 +111,7 @@ class Test_1_dbm(unittest.TestCase):
 
 
     @unittest.skip('for some reason')
-    def test_55555_delete_data_in_some_condition(self):
+    def test_5_delete_data_in_some_condition(self):
         self.db.delete_data(model=TestModels, attr_1='kim')
     
     @unittest.skip('for some reason')
@@ -153,6 +153,7 @@ class Test_1_dbm(unittest.TestCase):
         # self.db.create_table(model=TestModel, autoIncrement=['attr_1', 'attr_2'], pri ['attr_1','attr_2'])
         self.db.create_table(model=TestModels, autoIncremnet=['attr_1', 'attr_2'], primaryKey=['attr_1', 'attr_3'], attr_1='integer' ,attr_5='varchar(100)')
     
+    @unittest.skip('for some reason')
     def test_12_index(self):
         self.db.create_table(model=TestModels)
         self.db.create_index(model=TestModels, index='attr_2', unique=True)
