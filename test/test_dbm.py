@@ -4,7 +4,7 @@ from pathlib import Path
 from datetime import date, datetime
 import sqlite3
 import pymysql
-from Isql.sql import Sql
+from Isql.sqlite import Sql
 from Isql.dbm import DBM
 
 class TestModel(Sql):
@@ -70,7 +70,7 @@ class Test_1_dbm(unittest.TestCase):
 
         self.db_path = Path.cwd().joinpath('test','test.db') 
         connect = sqlite3.connect(self.db_path)
-        connect = pymysql.connect(host='192.168.35.243', port=3306, user='ajcltm', passwd='2642805Ab!', db='test', charset='utf8')
+        # connect = pymysql.connect(host='192.168.35.243', port=3306, user='ajcltm', passwd='2642805Ab!', db='test', charset='utf8')
         self.db = DBM(connect=connect)
     
     @unittest.skip('for some reason')
@@ -83,7 +83,7 @@ class Test_1_dbm(unittest.TestCase):
         self.db.create_table(model=TestModel, attr_1='varchar(100)', attr_2='tinyint')
         self.db.drop_table(model=TestModel)
 
-    @unittest.skip('for some reason')
+    # @unittest.skip('for some reason')
     def test_3_insert_data(self):
         self.db.create_table(model=TestModel)
         self.db.insert_data(data=self.data1)
@@ -92,7 +92,7 @@ class Test_1_dbm(unittest.TestCase):
         self.db.insert_data(data=self.data4)
         self.db.insert_data(data=self.dataset)
     
-    # @unittest.skip('for some reason')
+    @unittest.skip('for some reason')
     def test_4_insert_large_scale_data(self):
         def create_data(num):
             raw_data = {
