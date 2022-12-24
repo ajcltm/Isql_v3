@@ -44,7 +44,7 @@ class DBM:
         self.cur.execute(sql)
         self.con.commit()
 
-    def insert_data(self, data):
+    def insert_data(self, data, limit=5000):
         def check_dataset(model):
             if not list(model.__fields__.keys())[0] == 'data':
                 return False
@@ -53,13 +53,13 @@ class DBM:
             return True
 
         def check_scale(dataset):
-            return bool(len(dataset.data) > 5000)
+            return bool(len(dataset.data) > limit)
 
         def chunk_dataset(dataset):
             model = dataset.__class__
             temp = []
-            for i in tqdm(range(0, len(dataset.data), 5000), desc='chunking the dataset now...'):
-               temp.append(model(data=dataset.data[i:i+5000])) 
+            for i in tqdm(range(0, len(dataset.data), limit), desc='chunking the dataset now...'):
+               temp.append(model(data=dataset.data[i:i+limit])) 
             dataset = None
             return temp
 
