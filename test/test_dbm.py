@@ -1,13 +1,20 @@
 import unittest
 from typing import Optional, List
-from pathlib import Path
 from datetime import date, datetime
-import sqlite3
-import pymysql
-from Isql.sqlite import Sql
-from Isql.dbm import DBM
+from Isql import sql, DBM
+from pathlib import Path
 
-class TestModel(Sql):
+
+# _dir = str(Path.cwd().joinpath('test', 'test.db'))
+# protocol = f'sqlite://database?{_dir};'
+# engine = sql.create_engine(protocol)
+# _sql = engine.get_sql()
+
+protocol = f'mysql://host?192.168.35.243;port?3306;user?ajcltm;passwd?2642805Ab!;db?test;charset?utf8mb4;'
+engine = sql.create_engine(protocol)
+_sql = engine.get_sql()
+
+class TestModel(_sql):
     attr_1 : str
     attr_2 : int
     attr_3 : float
@@ -15,10 +22,10 @@ class TestModel(Sql):
     attr_5 : datetime
     attr_6 : Optional[str]
 
-class TestModels(Sql):
+class TestModels(_sql):
     data : List[TestModel]
 
-class TestModelAttr(Sql):
+class TestModelAttr(_sql):
     model : str
     attr_some : str
 
@@ -68,10 +75,8 @@ class Test_1_dbm(unittest.TestCase):
         self.data4 = TestModel(**self.raw_data4)
         self.dataset = TestModels(data=[self.data1, self.data2, self.data3, self.data4])
 
-        self.db_path = Path.cwd().joinpath('test','test.db') 
-        connect = sqlite3.connect(self.db_path)
-        # connect = pymysql.connect(host='192.168.35.243', port=3306, user='ajcltm', passwd='2642805Ab!', db='test', charset='utf8')
-        self.db = DBM(connect=connect)
+        
+        self.db = DBM(engine.get_connector())
     
     @unittest.skip('for some reason')
     def test_1_create_table_default_type_and_drop(self):
@@ -106,8 +111,8 @@ class Test_1_dbm(unittest.TestCase):
             return raw_data
 
         self.db.create_table(model=TestModels)
-        large_dataset = TestModels(data=[create_data(i) for i in range(5500)])
-        self.db.insert_data(data=large_dataset)
+        large_dataset = TestModels(data=[create_data(i) for i in range(30000)])
+        self.db.insert_data(data=large_dataset, limit=30002)
 
 
     @unittest.skip('for some reason')
@@ -142,14 +147,14 @@ class Test_1_dbm(unittest.TestCase):
     @unittest.skip('for some reason')
     def test_10_primaryKey(self):
         # self.db.create_table(model=TestModel, primaryKey='attr_1')
-        # self.db.create_table(model=TestModel, primaryKey=['attr_1', 'attr_2'])
-        self.db.create_table(model=TestModels)
-        self.db.add_primaryKey(model=TestModels, primaryKey=['attr_1', 'attr_3'])
+        self.db.create_table(model=TestModel, primaryKey=['attr_1', 'attr_2'])
+        # self.db.create_table(model=TestModels)
+        # self.db.add_primaryKey(model=TestModels, primaryKey=['attr_1', 'attr_3'])
         # self.db.drop_primaryKey(model=TestModel)
     
     @unittest.skip('for some reason')
     def test_11_auto_increment(self):
-        # self.db.create_table(model=TestModel, autoIncremnet=['attr_1', 'attr_2'])
+        self.db.create_table(model=TestModel, autoIncremnet=['attr_1', 'attr_2'])
         # self.db.create_table(model=TestModel, autoIncrement=['attr_1', 'attr_2'], pri ['attr_1','attr_2'])
         self.db.create_table(model=TestModels, autoIncremnet=['attr_1', 'attr_2'], primaryKey=['attr_1', 'attr_3'], attr_1='integer' ,attr_5='varchar(100)')
     
