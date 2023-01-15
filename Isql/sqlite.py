@@ -1,4 +1,4 @@
-from Isql import utils
+from Isql import utils, querySql
 from pydantic import BaseModel
 
 class CreateDropSql(BaseModel):
@@ -123,6 +123,13 @@ class UpdateSql:
             sql = f"{self.sql} {where_part}"
             print(f'update sql : \n {sql}')
             return sql
+
+class QuerySql:
+    def get_query(self, cls, subQuery):
+        table_name = utils.TableNameExporter().get_table_name(model=cls)
+        return querySql.QuerySql(tableName=table_name, subQuery=subQuery)
+
+
 
 class Sqlite(CreateDropSql, IndexSql, InsertSql, DeleteSql, UpdateSql):
     pass

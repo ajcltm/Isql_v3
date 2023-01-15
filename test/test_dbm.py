@@ -88,7 +88,6 @@ class Test_1_dbm(unittest.TestCase):
         self.db.create_table(model=TestModel, attr_1='varchar(100)', attr_2='tinyint')
         self.db.drop_table(model=TestModel)
 
-    # @unittest.skip('for some reason')
     def test_3_insert_data(self):
         self.db.create_table(model=TestModel)
         self.db.insert_data(data=self.data1)
@@ -123,9 +122,8 @@ class Test_1_dbm(unittest.TestCase):
     def test_6_delete_data(self):
         self.db.delete_data(model=TestModels)
 
-    @unittest.skip('for some reason')
     def test_7_query_data(self):
-        data = self.db.query_data(model=TestModels, sql='select * from TestModel')
+        data = self.db.query_data(sql='select * from TestModel')
         print(data)
 
     @unittest.skip('for some reason')

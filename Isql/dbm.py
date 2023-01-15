@@ -1,4 +1,7 @@
+from typing import List
+from dataclasses import make_dataclass
 from tqdm import tqdm
+
 
 class DBM:
 
@@ -101,10 +104,28 @@ class DBM:
                 self.con.commit()
         return Where(con=self.con, cur=self.cur, origin_where=where)
 
-    def query_data(self, model, sql):
-        self.cur.execute(sql)
-        fields = list(model.__fields__.get('data').type_.__fields__.keys()) 
-        temp = []
-        for row in self.cur.fetchall():
-            temp.append({fields[idx] : value for idx, value in enumerate(row)})
-        return model(data=temp)
+    
+    def query(self, sql):
+
+        class QuerySql:
+            def __init__(self, sql):
+                self.sql = sql
+            def export_data(self):
+                sql_clause = self.sql.export_sql()
+                print(f'query sql : \n {sql_clause}')
+                self.cur.execute(sql_clause)
+                return mapping_data()
+
+        def mapping_data(self):
+            fields = [field[0] for field in self.cur.description]
+            model = make_dataclass('data', fields=fields)     
+            models = make_dataclass('dataset', fields=[('data', List)])
+            temp = []
+            for row in self.cur.fetchall():
+                temp.append({fields[idx] : value for idx, value in enumerate(row)})
+            dataList = [model(**data) for data in temp]
+            temp = None
+            return models(data=dataList)
+        
+        return QuerySql(sql=sql)
+
