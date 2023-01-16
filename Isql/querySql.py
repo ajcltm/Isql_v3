@@ -1,47 +1,18 @@
 from abc import ABC, abstractmethod
 
-def replace_alias_for_field(field, table):
-    splited = field.split('.')
-    if len(splited)>1:
-        if splited[0] in table:
-            alias = table[splited[0]]['alias']
-            if alias:
-                return f'{alias}.{splited[1]}'
-            else:
-                return field
-        else:
-            return field
-    return field
-
-def replace_alias_for_variable(variable, table):
-    for tableName in table.keys():
-        splited = variable.split(tableName)
+def process_for_variable(var, table_info):
+    for tableName in table_info.keys():
+        splited = var.split(tableName)
         if len(splited)>1:
-            alias = table[tableName]['alias']
-            if alias:
-                no_under_bar = splited[-1].replace('_', '') 
-                return f'{alias}.{no_under_bar}'
-            else:
-                no_under_bar = splited[-1].replace('_', '') 
-                return f'{tableName}.{no_under_bar}'
-    return variable
+            pure_variable = splited[-1][1:]
+            alias = table_info[tableName]['alias']
+            if not alias:
+                return f'{tableName}.{pure_variable}'
+            return f'{alias}.{pure_variable}'
+    return var
 
-def handle_colon(value, table):
-    if value in table:
-        value = table[value]['subQuery'].export_sql()
-        return f'({value})'
-    if value.isdigit():
-        return int(value)
-    if value[0] =='(':
-        value = value.strip()
-        value = value[1:-1]
-        splited = value.split(',')
-        colon_splited = [f'"{v.strip()}"' for v in splited]
-        colon_content = ', '.join(colon_splited)
-        return f'({colon_content})'
-    return f'"{value}"'
 
-def divide_symbols_and_values(condition, table, colon=True):
+def divide_symbols_and_values(condition, table):
     symbols = ['<=', '>=', '>', '<','=', 'in ']
     lst = []
     for field, con in condition.items():
@@ -49,14 +20,11 @@ def divide_symbols_and_values(condition, table, colon=True):
             splited = con.split(symbol)
             if len(splited) > 1:
                 value = splited[-1].strip() 
-                if colon:
-                    value = handle_colon(value=value, table=table)
                 symbol = symbol.strip()
-                expression = f'{field} {symbol} {value}' 
+                expression = (field, symbol, value)
                 lst.append(expression)
                 break
-    con_str = ' and '.join(lst)
-    return con_str
+    return lst
 
 class Clause(ABC):
 
@@ -78,7 +46,7 @@ class Select(Clause):
     def export_sql(self, aliasState):
         self.set_aliasState(aliasState=aliasState)
         if self.fields:
-            adjusted_fields = [replace_alias_for_field(field, self.table) for field in self.fields]
+            adjusted_fields = [process_for_variable(field, self.table) for field in self.fields]
             select_part = ', '.join(adjusted_fields)
         else:
             select_part = '*'
@@ -136,9 +104,9 @@ class Join(Clause):
         self.set_aliasState(aliasState=aliasState)
         if self.check_inlineView(self.tableName):
             inleview_clause = self.table[self.tableName]['subQuery'].export_sql(aliasState=aliasState)
-            self.table[self.tableName]['alias'] = self.aliasstate.get_alias()
+            self.table[self.tableName]['alias'] = self.aliasState.get_alias()
             alias = self.table[self.tableName]['alias']
-            return f'{self.how}join ({inleview_clause}) {alias}'
+            return f'{self.how} join ({inleview_clause}) {alias}'
         else:
             if self.tableName in self.table:
                 alias = self.table[self.tableName]['alias']
@@ -153,10 +121,13 @@ class On(Clause):
     
     def export_sql(self, aliasState):
         self.set_aliasState(aliasState=aliasState)
-        adjusted_keys = [replace_alias_for_variable(variable, self.table) for variable in self.condition.keys()]
-        adjusted_condition = {adjusted_keys[i] : con for i, con in enumerate(self.condition.values())}
-        where_part = divide_symbols_and_values(adjusted_condition, self.table, colon=False)
-        return f'On {where_part}'
+        var_symbols_var_tuple_lst = divide_symbols_and_values(self.condition, self.table)
+        processed = []
+        for tuple_ in var_symbols_var_tuple_lst:
+            processed.append([process_for_variable(i, self.table) for i in tuple_])
+        condition_lst = [' '.join(tuple_) for tuple_ in processed]
+        on_part = ' and '.join(condition_lst)
+        return f'On {on_part}'
 
 class Where(Clause):
 
@@ -165,9 +136,12 @@ class Where(Clause):
     
     def export_sql(self, aliasState):
         self.set_aliasState(aliasState=aliasState)
-        adjusted_keys = [replace_alias_for_variable(variable, self.table) for variable in self.condition.keys()]
-        adjusted_condition = {adjusted_keys[i] : con for i, con in enumerate(self.condition.values())}
-        where_part = divide_symbols_and_values(adjusted_condition, self.table)
+        var_symbols_var_tuple_lst = divide_symbols_and_values(self.condition, self.table)
+        processed = []
+        for tuple_ in var_symbols_var_tuple_lst:
+            processed.append([process_for_variable(i, self.table) for i in tuple_])
+        condition_lst = [' '.join(tuple_) for tuple_ in processed]
+        where_part = ' and '.join(condition_lst)
         return f'WHERE {where_part}'
 
 class GroupBy(Clause):
@@ -177,7 +151,7 @@ class GroupBy(Clause):
     
     def export_sql(self, aliasState):
         self.set_aliasState(aliasState=aliasState)
-        adjusted_fields = [replace_alias_for_field(field, self.table) for field in self.fields]
+        adjusted_fields = [process_for_variable(field, self.table) for field in self.fields]
         groupBy_part = ', '.join(adjusted_fields)
         return f'GROUP BY {groupBy_part}'
 
@@ -190,7 +164,7 @@ class Calculation(Clause):
     
     def export_sql(self, aliasState):
         self.set_aliasState(aliasState=aliasState)
-        adjusted_field = replace_alias_for_field(self.field, self.table)
+        adjusted_field = process_for_variable(self.field, self.table)
         sql_function = self.sql_fuction[self.kind]
         return f'{sql_function}({adjusted_field})'
 
@@ -201,7 +175,7 @@ class OrderBy(Clause):
     
     def export_sql(self, aliasState):
         self.set_aliasState(aliasState=aliasState)
-        adjusted_fields = [replace_alias_for_field(field, self.table) for field in self.fields]
+        adjusted_fields = [process_for_variable(field, self.table) for field in self.fields]
         groupBy_part = ', '.join(adjusted_fields)
         return f'ORDER BY {groupBy_part}'
 
@@ -218,8 +192,9 @@ class Alias:
 
 class QuerySql:
 
-    def __init__(self):
-        self.table = dict()
+    def __init__(self, table, subQuery=None):
+        self.table = table
+        self.table_info = dict()
         self.subQuery = dict()
 
         self.select_part = None
@@ -232,93 +207,100 @@ class QuerySql:
         self.orderBy_part = None
         self.alias_state = None
     
+        self.set_table(tableName=table, subQuery=subQuery)
+
     def set_table(self, tableName, subQuery=None):
-        self.table[tableName] = {'subQuery':subQuery, 'alias': None}
+        self.table_info[tableName] = {'subQuery':subQuery, 'alias': None}
         if self.select_part:
-            self.select_part.update_table(table=self.table)
+            self.select_part.update_table(table=self.table_info)
         if self.from_part:
-            self.from_part.update_table(table=self.table)
+            self.from_part.update_table(table=self.table_info)
         if self.join_part:
-            self.join_part.update_table(table=self.table)
+            self.join_part.update_table(table=self.table_info)
         if self.where_part:
-            self.where_part.update_table(table=self.table)
+            self.where_part.update_table(table=self.table_info)
         return self
     
     def select(self, *fields):
         self.select_part = Select(fields=fields)
-        self.select_part.update_table(table=self.table)
+        self.select_part.update_table(table=self.table_info)
+        if self.table :
+            self.from_(self.table)
         return self
     
     def from_(self, *tableName):
         self.from_part = From(tableName=tableName)
-        self.from_part.update_table(table=self.table)
+        self.from_part.update_table(table=self.table_info)
         return self
 
-    def join(self, tableName, how='left'):
+    def join(self, tableName, how='left', **condition):
         self.join_part = Join(tableName=tableName, how=how)
-        self.join_part.update_table(table=self.table)
+        self.join_part.update_table(table=self.table_info)
+
+        self.on_part = On(condition=condition)
+        self.on_part.update_table(table=self.table_info)
         return self
     
     def on(self, **condition):
         self.on_part = On(condition=condition)
-        self.on_part.update_table(table=self.table)
+        self.on_part.update_table(table=self.table_info)
         return self
 
     def where(self, **condition):
         self.where_part = Where(condition=condition)
-        self.where_part.update_table(table=self.table)
+        self.where_part.update_table(table=self.table_info)
         return self
 
     def group_by(self, *fields):
         self.groupBy_part = GroupBy(fields)
-        self.groupBy_part.update_table(table=self.table)
+        self.groupBy_part.update_table(table=self.table_info)
         return self
     
     def sum(self, fields):
         self.calculation_part.append(Calculation(fields, kind='sum'))
         for part in self.calculation_part:
-            part.update_table(table=self.table)
+            part.update_table(table=self.table_info)
         return self
 
     def min(self, fields):
         self.calculation_part.append(Calculation(fields, kind='min'))
         for part in self.calculation_part:
-            part.update_table(table=self.table)
+            part.update_table(table=self.table_info)
         return self
 
     def max(self, fields):
         self.calculation_part.append(Calculation(fields, kind='max'))
         for part in self.calculation_part:
-            part.update_table(table=self.table)
+            part.update_table(table=self.table_info)
         return self
 
     def avg(self, fields):
         self.calculation_part.append(Calculation(fields, kind='avg'))
         for part in self.calculation_part:
-            part.update_table(table=self.table)
+            part.update_table(table=self.table_info)
         return self
 
     def variance(self, fields):
         self.calculation_part.append(Calculation(fields, kind='variance'))
         for part in self.calculation_part:
-            part.update_table(table=self.table)
+            part.update_table(table=self.table_info)
         return self
     
     def stddev(self, fields):
         self.calculation_part.append(Calculation(fields, kind='stddev'))
         for part in self.calculation_part:
-            part.update_table(table=self.table)
+            part.update_table(table=self.table_info)
         return self
     
     def count(self, fields):
         self.calculation_part.append(Calculation(fields, kind='count'))
         for part in self.calculation_part:
-            part.update_table(table=self.table)
+            part.update_table(table=self.table_info)
         return self
 
     def order_by(self, *fields):
         self.orderBy_part = OrderBy(fields)
-        self.orderBy_part.update_table(table=self.table)
+        self.orderBy_part.update_table(table=self.table_info)
         return self
     
     def export_sql(self, aliasState=None):
