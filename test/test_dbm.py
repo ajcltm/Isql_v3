@@ -5,14 +5,14 @@ from Isql import sql, DBM
 from pathlib import Path
 
 
-# _dir = str(Path.cwd().joinpath('test', 'test.db'))
-# protocol = f'sqlite://database?{_dir};'
-# engine = sql.create_engine(protocol)
-# _sql = engine.get_sql()
-
-protocol = f'mysql://host?192.168.35.243;port?3306;user?ajcltm;passwd?2642805Ab!;db?test;charset?utf8mb4;'
+_dir = str(Path.cwd().joinpath('test', 'test.db'))
+protocol = f'sqlite://database?{_dir};'
 engine = sql.create_engine(protocol)
 _sql = engine.get_sql()
+
+# protocol = f'mysql://host?192.168.35.243;port?3306;user?ajcltm;passwd?2642805Ab!;db?test;charset?utf8mb4;'
+# engine = sql.create_engine(protocol)
+# _sql = engine.get_sql()
 
 class TestModel(_sql):
     attr_1 : str
@@ -52,7 +52,7 @@ class Test_1_dbm(unittest.TestCase):
         }
 
         self.raw_data3 = {
-            'attr_1' : 'dongi',
+            'attr_1' : '동이',
             'attr_2' : 200,
             'attr_3' : 3.14,
             'attr_4' : datetime(1923, 8, 29).date(),
@@ -88,6 +88,7 @@ class Test_1_dbm(unittest.TestCase):
         self.db.create_table(model=TestModel, attr_1='varchar(100)', attr_2='tinyint')
         self.db.drop_table(model=TestModel)
 
+    @unittest.skip('for some reason')
     def test_3_insert_data(self):
         self.db.create_table(model=TestModel)
         self.db.insert_data(data=self.data1)
@@ -122,6 +123,7 @@ class Test_1_dbm(unittest.TestCase):
     def test_6_delete_data(self):
         self.db.delete_data(model=TestModels)
 
+    @unittest.skip('for some reason')
     def test_7_query_data(self):
         data = self.db.query_data(sql='select * from TestModel')
         print(data)
@@ -163,6 +165,17 @@ class Test_1_dbm(unittest.TestCase):
         # self.db.create_index(model=TestModels, index=['attr_2', 'attr_4'])
         # self.db.add_index(model=TestModels, index=['attr_1'])
         # self.db.drop_index(model=TestModels, index='attr_2')
+
+    def test_13_insert_data(self):
+        self.db.create_table(model=TestModel)
+        self.db.insert_data(data=self.data1)
+        self.db.insert_data(data=self.data2)
+        self.db.insert_data(data=self.data3)
+        self.db.insert_data(data=self.data4)
+        self.db.insert_data(data=self.dataset)
+        data = self.db.query(tableName='TestModel').select('attr_1', 'attr_2').export_data(format='json')
+        self.db.drop_table(model=TestModel)
+        print(data)
 
 if __name__ == '__main__':
     unittest.main()

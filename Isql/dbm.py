@@ -1,6 +1,9 @@
 from typing import List
-from dataclasses import make_dataclass
+from dataclasses import make_dataclass, asdict
 from tqdm import tqdm
+from Isql import querySql
+import pandas as pd
+import json
 
 
 class DBM:
@@ -105,27 +108,41 @@ class DBM:
         return Where(con=self.con, cur=self.cur, origin_where=where)
 
     
-    def query(self, sql):
+    def query(self, tableName, subQuery=None):
 
-        class QuerySql:
-            def __init__(self, sql):
-                self.sql = sql
-            def export_data(self):
-                sql_clause = self.sql.export_sql()
+        class InnerQuerySql(querySql.QuerySql):
+
+            def __init__(self, cur, tableName, subQuery=None):
+                self.cur = cur
+                super().__init__(tableName, subQuery)
+
+            def export_data(self, format=None):
+                sql_clause = self.export_sql()
                 print(f'query sql : \n {sql_clause}')
                 self.cur.execute(sql_clause)
-                return mapping_data()
+                raw_data = self.mapping_data()
+                if not format:
+                    return raw_data
+                if format == 'df':
+                    df = pd.DataFrame(data=raw_data.data)
+                    raw_data = None
+                    return df 
+                if format == 'json':
+                    data_list =[asdict(i) for i in raw_data.data] 
+                    json_data = json.dumps({'data':data_list}, ensure_ascii=False)
+                    return json_data
 
-        def mapping_data(self):
-            fields = [field[0] for field in self.cur.description]
-            model = make_dataclass('data', fields=fields)     
-            models = make_dataclass('dataset', fields=[('data', List)])
-            temp = []
-            for row in self.cur.fetchall():
-                temp.append({fields[idx] : value for idx, value in enumerate(row)})
-            dataList = [model(**data) for data in temp]
-            temp = None
-            return models(data=dataList)
+
+            def mapping_data(self):
+                fields = [field[0] for field in self.cur.description]
+                model = make_dataclass('data', fields=fields)     
+                models = make_dataclass('dataset', fields=[('data', List)])
+                temp = []
+                for row in self.cur.fetchall():
+                    temp.append({fields[idx] : value for idx, value in enumerate(row)})
+                dataList = [model(**data) for data in temp]
+                temp = None
+                return models(data=dataList)
         
-        return QuerySql(sql=sql)
+        return InnerQuerySql(cur=self.cur, tableName=tableName, subQuery=subQuery)
 

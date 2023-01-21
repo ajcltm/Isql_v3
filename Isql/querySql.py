@@ -5,6 +5,9 @@ def process_for_variable(var, table_info):
         splited = var.split(tableName)
         if len(splited)>1:
             pure_variable = splited[-1][1:]
+            if pure_variable == '':
+                sql = table_info[tableName]['subQuery'].export_sql()
+                return f'({sql})'
             alias = table_info[tableName]['alias']
             if not alias:
                 return f'{tableName}.{pure_variable}'
@@ -12,8 +15,8 @@ def process_for_variable(var, table_info):
     return var
 
 
-def divide_symbols_and_values(condition, table):
-    symbols = ['<=', '>=', '>', '<','=', 'in ']
+def divide_symbols_and_values(condition):
+    symbols = ['<=', '>=', '>', '<','=', 'in ', 'IN ']
     lst = []
     for field, con in condition.items():
         for symbol in symbols:
@@ -99,20 +102,20 @@ class Join(Clause):
 
     def export_sql(self, aliasState):
         if not self.tableName in self.table:
-            return f'{self.how} join {self.tableName}'
+            return f'{self.how} JOIN {self.tableName}'
 
         self.set_aliasState(aliasState=aliasState)
         if self.check_inlineView(self.tableName):
             inleview_clause = self.table[self.tableName]['subQuery'].export_sql(aliasState=aliasState)
             self.table[self.tableName]['alias'] = self.aliasState.get_alias()
             alias = self.table[self.tableName]['alias']
-            return f'{self.how} join ({inleview_clause}) {alias}'
+            return f'{self.how} JOIN ({inleview_clause}) {alias}'
         else:
             if self.tableName in self.table:
                 alias = self.table[self.tableName]['alias']
-                return f'{self.how} join {self.tableName} {alias}'
+                return f'{self.how} JOIN {self.tableName} {alias}'
             else:
-                return f'{self.how} join {self.tableName}'
+                return f'{self.how} JOIN {self.tableName}'
         
 class On(Clause):
 
@@ -121,13 +124,13 @@ class On(Clause):
     
     def export_sql(self, aliasState):
         self.set_aliasState(aliasState=aliasState)
-        var_symbols_var_tuple_lst = divide_symbols_and_values(self.condition, self.table)
+        var_symbols_var_tuple_lst = divide_symbols_and_values(self.condition)
         processed = []
         for tuple_ in var_symbols_var_tuple_lst:
             processed.append([process_for_variable(i, self.table) for i in tuple_])
         condition_lst = [' '.join(tuple_) for tuple_ in processed]
-        on_part = ' and '.join(condition_lst)
-        return f'On {on_part}'
+        on_part = ' AND '.join(condition_lst)
+        return f'ON {on_part}'
 
 class Where(Clause):
 
@@ -136,12 +139,12 @@ class Where(Clause):
     
     def export_sql(self, aliasState):
         self.set_aliasState(aliasState=aliasState)
-        var_symbols_var_tuple_lst = divide_symbols_and_values(self.condition, self.table)
+        var_symbols_var_tuple_lst = divide_symbols_and_values(self.condition)
         processed = []
         for tuple_ in var_symbols_var_tuple_lst:
             processed.append([process_for_variable(i, self.table) for i in tuple_])
         condition_lst = [' '.join(tuple_) for tuple_ in processed]
-        where_part = ' and '.join(condition_lst)
+        where_part = ' AND '.join(condition_lst)
         return f'WHERE {where_part}'
 
 class GroupBy(Clause):
@@ -160,7 +163,7 @@ class Calculation(Clause):
     def __init__(self, field, kind):
         self.field = field
         self.kind = kind
-        self.sql_fuction = {'sum': 'SUM', 'min':'MIN', 'max':'MAX', 'avg':'AVG', 'count':'COUNT' ,'variance':'VARIANCE', 'stddev':'STDDEV'}
+        self.sql_fuction = {'sum': 'SUM', 'min':'MIN', 'max':'MAX', 'avg':'AVG', 'count':'COUNT' ,'variance':'VARIANCE', 'stddev':'STDDEV', 'lag':'LAG'}
     
     def export_sql(self, aliasState):
         self.set_aliasState(aliasState=aliasState)
@@ -192,8 +195,8 @@ class Alias:
 
 class QuerySql:
 
-    def __init__(self, table, subQuery=None):
-        self.table = table
+    def __init__(self, tableName, subQuery=None):
+        self.table = tableName
         self.table_info = dict()
         self.subQuery = dict()
 
@@ -207,7 +210,7 @@ class QuerySql:
         self.orderBy_part = None
         self.alias_state = None
     
-        self.set_table(tableName=table, subQuery=subQuery)
+        self.set_table(tableName=tableName, subQuery=subQuery)
 
     def set_table(self, tableName, subQuery=None):
         self.table_info[tableName] = {'subQuery':subQuery, 'alias': None}
@@ -233,8 +236,8 @@ class QuerySql:
         self.from_part.update_table(table=self.table_info)
         return self
 
-    def join(self, tableName, how='left', **condition):
-        self.join_part = Join(tableName=tableName, how=how)
+    def join(self, tableName, how='LEFT', **condition):
+        self.join_part = Join(tableName=tableName, how=how.upper())
         self.join_part.update_table(table=self.table_info)
 
         self.on_part = On(condition=condition)
@@ -298,6 +301,13 @@ class QuerySql:
             part.update_table(table=self.table_info)
         return self
 
+    def lag(self, fields):
+        self.calculation_part.append(Calculation(fields, kind='lag'))
+        for part in self.calculation_part:
+            part.update_table(table=self.table_info)
+        return self
+
+
     def order_by(self, *fields):
         self.orderBy_part = OrderBy(fields)
         self.orderBy_part.update_table(table=self.table_info)
@@ -320,5 +330,5 @@ class QuerySql:
                         clause_order['select'] = 'SELECT ' + ', '.join(lst)
                 else:
                     clause_order[clause] = part.export_sql(aliasState)
-        part_list = list(clause_order.values()) 
+        part_list = list(v for v in clause_order.values() if v != '') 
         return ' '.join(part_list)
