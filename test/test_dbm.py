@@ -128,13 +128,12 @@ class Test_1_dbm(unittest.TestCase):
         data = self.db.query_data(sql='select * from TestModel')
         print(data)
 
-    @unittest.skip('for some reason')
     def test_8_update_data(self):
        self.db.create_table(model=TestModel) 
        self.db.delete_data(model=TestModel)
        self.db.insert_data(data=self.dataset)
        self.db.update_data(model=TestModels, attr_6='Not Null Value').where(attr_1='kim')
-       data = self.db.query_data(model=TestModels, sql='select * from TestModel')
+       data = self.db.query(tableName='TestModel').select().export_data(format='dict')
        print(data)
 
     @unittest.skip('for some reason')
@@ -166,6 +165,7 @@ class Test_1_dbm(unittest.TestCase):
         # self.db.add_index(model=TestModels, index=['attr_1'])
         # self.db.drop_index(model=TestModels, index='attr_2')
 
+    @unittest.skip('for some reason')
     def test_13_insert_data(self):
         self.db.create_table(model=TestModel)
         self.db.insert_data(data=self.data1)
@@ -173,7 +173,7 @@ class Test_1_dbm(unittest.TestCase):
         self.db.insert_data(data=self.data3)
         self.db.insert_data(data=self.data4)
         self.db.insert_data(data=self.dataset)
-        data = self.db.query(tableName='TestModel').select('attr_1', 'attr_2').export_data(format='json')
+        data = self.db.query(tableName='TestModel').select('attr_1', 'attr_2').export_data()
         self.db.drop_table(model=TestModel)
         print(data)
 

@@ -133,7 +133,7 @@ class UpdateSql:
     @classmethod
     def get_update(cls, **values):
         def get_value_part(**values):
-            ls = [f"{key}='{value}'" for key, value in values.items()]
+            ls = [f"{key}=?" for key in values.keys()]
             value_part = 'SET ' + ', '.join(ls)
             return value_part
         table_name = utils.TableNameExporter().get_table_name(model=cls)
@@ -145,11 +145,12 @@ class UpdateSql:
         def __init__(self, sql):
             self.sql = sql
         def where(self, **arg):
-            ls = [f"{key}='{value}'" for key, value in arg.items()]
+            ls = [f"{key}=?" for key in arg.keys()]
             where_part = 'WHERE ' + ' and '.join(ls)
             sql = f"{self.sql} {where_part}"
             print(f'update sql : \n {sql}')
             return sql
+
 
 class Mysql(CreateDropSql, IndexSql, InsertSql, DeleteSql, UpdateSql):
     pass

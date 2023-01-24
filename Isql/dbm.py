@@ -97,15 +97,18 @@ class DBM:
     def update_data(self, model, **value):
         where = model.get_update(**value)
         class Where:
-            def __init__(self, con, cur, origin_where):
+            def __init__(self, con, cur, origin_where, update_condition):
                 self.con=con
                 self.cur=cur
                 self.origin_where = origin_where
+                self.update_condition = update_condition
             def where(self, **condition):
                 sql = self.origin_where.where(**condition)
-                self.cur.execute(sql)
+                self.update_condition.update(condition)
+                values = tuple(self.update_condition.values())
+                self.cur.execute(sql, values)
                 self.con.commit()
-        return Where(con=self.con, cur=self.cur, origin_where=where)
+        return Where(con=self.con, cur=self.cur, origin_where=where, update_condition=value)
 
     
     def query(self, tableName, subQuery=None):
@@ -116,33 +119,54 @@ class DBM:
                 self.cur = cur
                 super().__init__(tableName, subQuery)
 
+            def get_field_list(self):
+                return [field[0] for field in self.cur.description]
+
+            def get_dict_list(self, fields):
+                temp = []
+                for row in self.cur.fetchall():
+                    temp.append({fields[idx] : value for idx, value in enumerate(row)})
+                return temp
+
+            def get_dataclass_foramt(self, fields, dict_list):
+                model = make_dataclass('data', fields=fields)     
+                models = make_dataclass('dataset', fields=[('data', List)])
+                dataList = [model(**data) for data in dict_list]
+                dict_list = None
+                return models(data=dataList)
+
             def export_data(self, format=None):
                 sql_clause = self.export_sql()
                 print(f'query sql : \n {sql_clause}')
                 self.cur.execute(sql_clause)
-                raw_data = self.mapping_data()
-                if not format:
-                    return raw_data
+
+                if format=='dataclass':
+                    fields = self.get_field_list()
+                    dict_list = self.get_dict_list(fields=fields)
+                    return self.get_dataclass_foramt(fields=fields, dict_list=dict_list)
+
                 if format == 'df':
-                    df = pd.DataFrame(data=raw_data.data)
-                    raw_data = None
+                    fields = self.get_field_list()
+                    dict_list = self.get_dict_list(fields=fields)
+                    df = pd.DataFrame(data=dict_list)
+                    dict_list = None
                     return df 
+
                 if format == 'json':
-                    data_list =[asdict(i) for i in raw_data.data] 
-                    json_data = json.dumps({'data':data_list}, ensure_ascii=False)
+                    fields = self.get_field_list()
+                    dict_list = self.get_dict_list(fields=fields)
+                    json_data = json.dumps({'data':dict_list}, ensure_ascii=False)
+                    dict_list = None
                     return json_data
 
+                if format == 'dict':
+                    fields = self.get_field_list()
+                    dict_list = self.get_dict_list(fields=fields)
+                    dict_data = {'data':dict_list}
+                    dict_list = None
+                    return dict_data
 
-            def mapping_data(self):
-                fields = [field[0] for field in self.cur.description]
-                model = make_dataclass('data', fields=fields)     
-                models = make_dataclass('dataset', fields=[('data', List)])
-                temp = []
-                for row in self.cur.fetchall():
-                    temp.append({fields[idx] : value for idx, value in enumerate(row)})
-                dataList = [model(**data) for data in temp]
-                temp = None
-                return models(data=dataList)
+                return list(self.cur.fetchall())
         
         return InnerQuerySql(cur=self.cur, tableName=tableName, subQuery=subQuery)
 
